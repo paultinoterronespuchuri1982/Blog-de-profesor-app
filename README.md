@@ -2,7 +2,7 @@
 
 Arquitetura da Aplicação
 
-server.js: Arquivo principal do servidor, responsável por configurar e iniciar a aplicação.
+index.js: Arquivo principal do servidor, responsável por configurar e iniciar a aplicação.
 
 models/Post.js: Modelo de dados para as postagens.
 
