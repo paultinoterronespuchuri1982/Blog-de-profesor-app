@@ -1,43 +1,60 @@
-# Blog-de-profesor-app
+# Blog de Professor
 
-Arquitetura da Aplicação
+API REST em Node.js e Express para criar, ler, editar, apagar e buscar postagens de um blog.
+Os dados ficam em MongoDB (Mongoose).
 
-index.js: Arquivo principal do servidor, responsável por configurar e iniciar a aplicação.
+## Endpoints
 
-models/Post.js: Modelo de dados para as postagens.
+| Método | Rota | Autenticação | Descrição |
+| --- | --- | --- | --- |
+| GET | `/posts` | não | Lista as postagens. |
+| GET | `/posts/search?...` | não | Busca por palavras-chave. |
+| GET | `/posts/:id` | não | Lê uma postagem. |
+| POST | `/posts` | token | Cria uma postagem. |
+| PUT | `/posts/:id` | token | Edita uma postagem. |
+| DELETE | `/posts/:id` | token | Apaga uma postagem. |
 
-controllers/postController.js: Controladores para gerenciar as operações CRUD de postagens.
+As rotas que alteram dados exigem o cabeçalho `Authorization: Bearer <token>`, com um JWT assinado
+com `ACCESS_TOKEN_SECRET`. Sem token, a resposta é `401`. Com token inválido, é `403`.
 
-routes/postRoutes.js: Definição das rotas para as postagens.
+## Como rodar
 
-Dockerfile: Configuração para containerização da aplicação.
+Requisitos: Node.js 18 ou superior e MongoDB.
 
-docker-compose.yml: Configuração do Docker Compose para gerenciar múltiplos containers.
+Crie um arquivo `.env` na pasta `src/` (não versione):
 
-tests/post.test.js: Testes automatizados para os endpoints da aplicação.
+```
+PORT=3000
+MONGO_URI=mongodb://127.0.0.1:27017/blog
+ACCESS_TOKEN_SECRET=troque-por-um-valor-secreto
+```
 
+```bash
+npm install
+node src/index.js
+```
 
-Endpoints da API
+## Testes
 
-GET /posts: Lista de postagens.
+Os testes usam Jest e Supertest, e precisam de um MongoDB em `127.0.0.1:27017`.
 
-GET /posts/
-: Leitura de uma postagem específica.
+```bash
+npm test
+```
 
-POST /posts: Criação de postagens.
+O CI sobe um MongoDB como serviço antes de rodar os testes.
 
-PUT /posts/
-: Edição de postagens.
+## Estrutura
 
-DELETE /posts/
-: Exclusão de postagens.
+- `src/index.js`: inicia o servidor e conecta ao banco.
+- `src/routes/posts.js`: rotas das postagens.
+- `src/controllers/postcontroller.js`: lógica das rotas.
+- `src/models/Post.js`: modelo do Mongoose.
+- `src/middlewares/auth.js`: verifica o token JWT.
+- `src/tests/post.test.js`: testes dos endpoints.
+- `dockerfile`: imagem Docker da aplicação.
 
-GET /posts/search: Busca de postagens por palavras-chave.
+## Pendências
 
-GET /posts/admin: Listagem de todas as postagens (visão administrativa).
-
-Cobertura de Testes
-A cobertura de testes deve ser de pelo menos 30%. Utilize Jest e Supertest para implementar e rodar os testes.
-
-Autenticação e Autorização
-Os endpoints que modificam dados (POST, PUT, DELETE) devem incluir autenticação e autorização adequadas.
+- A rota `GET /posts/admin`, que o README anterior descrevia, não existe. Decida se precisa dela.
+- Não há rota de login que emita o token. Por enquanto, o token deve vir de outro serviço.

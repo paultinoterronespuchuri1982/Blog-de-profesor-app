@@ -1,114 +1,109 @@
 // src/tests/post.test.js
+// Needs a MongoDB running on 127.0.0.1:27017 (CI starts one as a service).
 const request = require('supertest');
 const express = require('express');
 const bodyParser = require('body-parser');
 const mongoose = require('mongoose');
-const app = express();
+const jwt = require('jsonwebtoken');
 
-// Configuração do middleware e rotas para testes
+// The auth middleware reads this secret, so set it before loading the routes.
+process.env.ACCESS_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET || 'test-secret';
+const token = jwt.sign({ id: 'test-user' }, process.env.ACCESS_TOKEN_SECRET);
+const auth = `Bearer ${token}`;
+
+const app = express();
 app.use(bodyParser.json());
 
-// Configuração da conexão com o banco de dados em memória
 beforeAll(async () => {
-  const url = 'mongodb://127.0.0.1:27017/test_db'; // Banco de dados em memória para testes
-  await mongoose.connect(url, { useNewUrlParser: true, useUnifiedTopology: true });
+  await mongoose.connect('mongodb://127.0.0.1:27017/test_db', {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+  });
 });
 
 afterAll(async () => {
   await mongoose.connection.close();
 });
 
-// Importa e usa as rotas do post
 const postRoutes = require('../routes/posts');
 app.use('/posts', postRoutes);
 
-// Teste de criação de post
+const samplePost = (title) => ({
+  title,
+  content: `This post is created for ${title}.`,
+  author: 'Professor Test',
+});
+
 describe('POST /posts', () => {
-  it('deve criar um novo post', async () => {
+  it('cria um post quando o token é válido', async () => {
     const response = await request(app)
       .post('/posts')
-      .send({
-        title: 'Test Post',
-        content: 'This is a test post.',
-        author: 'Professor Test'
-      });
+      .set('Authorization', auth)
+      .send(samplePost('Test Post'));
     expect(response.statusCode).toBe(201);
     expect(response.body).toHaveProperty('title', 'Test Post');
   });
+
+  it('recusa criar um post sem token', async () => {
+    const response = await request(app).post('/posts').send(samplePost('No Token'));
+    expect(response.statusCode).toBe(401);
+  });
 });
 
-// Teste de leitura de post por ID
 describe('GET /posts/:id', () => {
   let postId;
 
   beforeAll(async () => {
-    // Cria um post para os testes de leitura
     const response = await request(app)
       .post('/posts')
-      .send({
-        title: 'Test Post for Read',
-        content: 'This post is created for read test.',
-        author: 'Professor Read Test'
-      });
+      .set('Authorization', auth)
+      .send(samplePost('Test Post for Read'));
     postId = response.body._id;
   });
 
-  it('deve ler um post por ID', async () => {
-    const response = await request(app)
-      .get(`/posts/${postId}`);
+  it('lê um post por ID sem token', async () => {
+    const response = await request(app).get(`/posts/${postId}`);
     expect(response.statusCode).toBe(200);
     expect(response.body).toHaveProperty('title', 'Test Post for Read');
   });
 });
 
-// Teste de atualização de post
 describe('PUT /posts/:id', () => {
   let postId;
 
   beforeAll(async () => {
-    // Cria um post para os testes de atualização
     const response = await request(app)
       .post('/posts')
-      .send({
-        title: 'Test Post for Update',
-        content: 'This post is created for update test.',
-        author: 'Professor Update Test'
-      });
+      .set('Authorization', auth)
+      .send(samplePost('Test Post for Update'));
     postId = response.body._id;
   });
 
-  it('deve atualizar um post', async () => {
+  it('atualiza um post com token', async () => {
     const response = await request(app)
       .put(`/posts/${postId}`)
-      .send({
-        title: 'Updated Test Post',
-        content: 'This post has been updated.',
-        author: 'Professor Update Test'
-      });
+      .set('Authorization', auth)
+      .send({ ...samplePost('Updated Test Post') });
     expect(response.statusCode).toBe(200);
     expect(response.body).toHaveProperty('title', 'Updated Test Post');
   });
 });
 
-// Teste de exclusão de post
 describe('DELETE /posts/:id', () => {
   let postId;
 
   beforeAll(async () => {
-    // Cria um post para os testes de exclusão
     const response = await request(app)
       .post('/posts')
-      .send({
-        title: 'Test Post for Delete',
-        content: 'This post is created for delete test.',
-        author: 'Professor Delete Test'
-      });
+      .set('Authorization', auth)
+      .send(samplePost('Test Post for Delete'));
     postId = response.body._id;
   });
 
-  it('deve deletar um post', async () => {
+  it('apaga um post com token', async () => {
     const response = await request(app)
-      .delete(`/posts/${postId}`);
+      .delete(`/posts/${postId}`)
+      .set('Authorization', auth);
     expect(response.statusCode).toBe(200);
     expect(response.body).toHaveProperty('message', 'Postagem deletada com sucesso');
   });
