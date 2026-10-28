@@ -8,8 +8,12 @@ const jwt = require('jsonwebtoken');
 
 // The auth middleware reads this secret, so set it before loading the routes.
 process.env.ACCESS_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET || 'test-secret';
-const token = jwt.sign({ id: 'test-user' }, process.env.ACCESS_TOKEN_SECRET);
+process.env.ADMIN_USERNAME = 'professor';
+process.env.ADMIN_PASSWORD_HASH = require('../utils/password').hashPassword('senha-de-teste');
+
+const token = jwt.sign({ id: 'test-user' }, process.env.ACCESS_TOKEN_SECRET, { algorithm: 'HS256' });
 const auth = `Bearer ${token}`;
+const otherAuth = `Bearer ${jwt.sign({ id: 'other-user' }, process.env.ACCESS_TOKEN_SECRET, { algorithm: 'HS256' })}`;
 
 const app = express();
 app.use(bodyParser.json());
@@ -25,8 +29,25 @@ afterAll(async () => {
   await mongoose.connection.close();
 });
 
-const postRoutes = require('../routes/posts');
-app.use('/posts', postRoutes);
+app.use('/auth', require('../routes/auth'));
+app.use('/posts', require('../routes/posts'));
+
+describe('POST /auth/login', () => {
+  it('devolve um token com credenciais corretas', async () => {
+    const response = await request(app)
+      .post('/auth/login')
+      .send({ username: 'professor', password: 'senha-de-teste' });
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toHaveProperty('token');
+  });
+
+  it('recusa a senha errada', async () => {
+    const response = await request(app)
+      .post('/auth/login')
+      .send({ username: 'professor', password: 'errada' });
+    expect(response.statusCode).toBe(401);
+  });
+});
 
 const samplePost = (title) => ({
   title,
@@ -65,6 +86,33 @@ describe('GET /posts/:id', () => {
     const response = await request(app).get(`/posts/${postId}`);
     expect(response.statusCode).toBe(200);
     expect(response.body).toHaveProperty('title', 'Test Post for Read');
+  });
+});
+
+describe('Ownership', () => {
+  let postId;
+
+  beforeAll(async () => {
+    const response = await request(app)
+      .post('/posts')
+      .set('Authorization', auth)
+      .send(samplePost('Owned by test-user'));
+    postId = response.body._id;
+  });
+
+  it('impede que outro usuário edite o post', async () => {
+    const response = await request(app)
+      .put(`/posts/${postId}`)
+      .set('Authorization', otherAuth)
+      .send({ title: 'Hacked' });
+    expect(response.statusCode).toBe(403);
+  });
+
+  it('impede que outro usuário apague o post', async () => {
+    const response = await request(app)
+      .delete(`/posts/${postId}`)
+      .set('Authorization', otherAuth);
+    expect(response.statusCode).toBe(403);
   });
 });
 

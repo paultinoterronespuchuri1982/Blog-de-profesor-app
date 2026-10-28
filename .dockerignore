@@ -1,2 +1,9 @@
 node_modules
 npm-debug.log
+.git
+.github
+.env
+.env.*
+src/.env
+*.pem
+*.key

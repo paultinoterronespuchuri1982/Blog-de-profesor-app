@@ -1,27 +1,20 @@
 # Dockerfile
-FROM node:18
+FROM node:20-alpine
 
-# Definir o diretório de trabalho
 WORKDIR /usr/src/app
+ENV NODE_ENV=production
 
-# Copiar os arquivos de package.json e package-lock.json
+# Dependencies first, so this layer is cached between builds.
 COPY package*.json ./
+RUN npm install --omit=dev && npm cache clean --force
 
-# Instalar as dependências
-RUN npm install
-
-# Copiar o restante dos arquivos do projeto
 COPY . .
 
-# Expor a porta que a aplicação irá rodar
+# Do not run as root.
+USER node
+
 EXPOSE 3000
 
-# Adicionar labels recomendadas
-LABEL \
-  name="blog-de-professor-app" \
-  version="1.0" \
-  description="Aplicação de blogging dinâmico para professores." \
-  maintainer="Seu Nome <seu.email@dominio.com>"
+LABEL name="blog-de-professor-app" version="1.1" description="API de blog para professores."
 
-# Comando para iniciar a aplicação
 CMD ["node", "src/index.js"]
