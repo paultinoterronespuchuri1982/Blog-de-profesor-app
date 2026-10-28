@@ -1,24 +1,24 @@
 // src/index.js
-require('dotenv').config(); // Carrega variáveis de ambiente do arquivo .env
-const express = require('express');
+// Ponto de entrada: conecta ao MongoDB e inicia o servidor HTTP.
+require('dotenv').config();
 const mongoose = require('mongoose');
-const bodyParser = require('body-parser');
-const app = express();
-const port = process.env.PORT || 3000;
+const app = require('./app');
 
-// Middleware para analisar o corpo das requisições
-app.use(bodyParser.json());
+const PORT = process.env.PORT || 3000;
+const MONGO_URI = process.env.MONGO_URI;
 
-// Conexão com o banco de dados
-mongoose.connect(process.env.MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
-  .then(() => console.log('Banco de dados conectado'))
-  .catch(err => console.error('Erro ao conectar ao banco de dados', err));
+if (!MONGO_URI) {
+  console.error('Defina MONGO_URI no arquivo .env (veja .env.example)');
+  process.exit(1);
+}
 
-// Importa e usa as rotas
-const postRoutes = require('./routes/posts');
-app.use('/posts', postRoutes);
-
-// Inicia o servidor
-app.listen(port, () => {
-  console.log(`Servidor rodando na porta ${port}`);
-});
+mongoose
+  .connect(MONGO_URI)
+  .then(() => {
+    console.log('Banco de dados conectado');
+    app.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));
+  })
+  .catch((err) => {
+    console.error('Erro ao conectar ao banco de dados', err.message);
+    process.exit(1);
+  });

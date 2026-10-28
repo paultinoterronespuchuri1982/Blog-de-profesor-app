@@ -1,43 +1,99 @@
-# Blog-de-profesor-app
+# Blog de Professor
 
-Arquitetura da Aplicação
+API REST para publicar, editar e buscar postagens de aulas e avisos, pensada para professores. Construída com Node.js, Express e MongoDB, com autenticação JWT nas operações de escrita, testes automatizados e pipeline de CI com publicação de imagem Docker.
 
-index.js: Arquivo principal do servidor, responsável por configurar e iniciar a aplicação.
+## Tecnologias
 
-models/Post.js: Modelo de dados para as postagens.
+- **Node.js 18** e **Express 4**
+- **MongoDB** com **Mongoose 8** (índice de texto para busca)
+- **JWT** (`jsonwebtoken`) para proteger criação, edição e exclusão
+- **Jest** e **Supertest** para testes de integração
+- **Docker** e **GitHub Actions** (testes, build e publicação no GHCR)
 
-controllers/postController.js: Controladores para gerenciar as operações CRUD de postagens.
+## Arquitetura
 
-routes/postRoutes.js: Definição das rotas para as postagens.
+```
+src/
+├── index.js                 # Conecta ao MongoDB e inicia o servidor
+├── app.js                   # Configuração do Express (sem listen, testável)
+├── routes/posts.js          # Definição das rotas e quais exigem token
+├── controllers/postController.js  # Regras de cada operação CRUD e busca
+├── middlewares/auth.js      # Validação do token JWT
+├── models/Post.js           # Schema e índice de texto
+└── tests/posts.test.js      # Testes de integração dos endpoints
+```
 
-Dockerfile: Configuração para containerização da aplicação.
+## Como executar
 
-docker-compose.yml: Configuração do Docker Compose para gerenciar múltiplos containers.
+Requisitos: Node.js 18+ e uma instância do MongoDB (local ou Atlas).
 
-tests/post.test.js: Testes automatizados para os endpoints da aplicação.
+```bash
+npm install
+cp .env.example .env        # ajuste MONGO_URI e ACCESS_TOKEN_SECRET
+npm start
+```
 
+Com Docker:
 
-Endpoints da API
+```bash
+docker build -t blog-de-professor-app .
+docker run --env-file .env -p 3000:3000 blog-de-professor-app
+```
 
-GET /posts: Lista de postagens.
+## Endpoints
 
-GET /posts/
-: Leitura de uma postagem específica.
+| Método | Rota | Auth | Descrição |
+|---|---|---|---|
+| GET | `/health` | não | Verificação de saúde do serviço |
+| GET | `/posts` | não | Lista as postagens, mais recentes primeiro |
+| GET | `/posts/search?q=termo` | não | Busca por palavra-chave no título e conteúdo |
+| GET | `/posts/:id` | não | Lê uma postagem pelo ID |
+| POST | `/posts` | sim | Cria uma postagem |
+| PUT | `/posts/:id` | sim | Atualiza os campos enviados |
+| DELETE | `/posts/:id` | sim | Remove uma postagem |
 
-POST /posts: Criação de postagens.
+Exemplo de criação:
 
-PUT /posts/
-: Edição de postagens.
+```bash
+curl -X POST http://localhost:3000/posts \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{"title":"Aula 1","content":"Introdução às frações","author":"Prof. Ana"}'
+```
 
-DELETE /posts/
-: Exclusão de postagens.
+Respostas de erro: `400` para dados ou ID inválidos, `401` sem token, `403` com token inválido e `404` quando a postagem não existe.
 
-GET /posts/search: Busca de postagens por palavras-chave.
+## Testes
 
-GET /posts/admin: Listagem de todas as postagens (visão administrativa).
+Os testes usam um banco separado definido em `MONGO_URI_TEST`.
 
-Cobertura de Testes
-A cobertura de testes deve ser de pelo menos 30%. Utilize Jest e Supertest para implementar e rodar os testes.
+```bash
+npm test
+```
 
-Autenticação e Autorização
-Os endpoints que modificam dados (POST, PUT, DELETE) devem incluir autenticação e autorização adequadas.
+Cobrem criação, leitura, atualização, exclusão, busca e a exigência de autenticação nas rotas de escrita.
+
+## Integração contínua
+
+A pipeline em `.github/workflows/ci.yml`:
+
+1. Sobe um MongoDB 7 como serviço e roda os testes em cada push e pull request para `main`.
+2. Só em push para `main`, e apenas se os testes passarem, constrói a imagem Docker e a publica no GitHub Container Registry.
+
+## Decisões técnicas
+
+- **App separada do servidor** (`app.js` e `index.js`): permite testar as rotas com Supertest sem abrir uma porta.
+- **Campos editáveis em lista explícita**: o controlador só aceita `title`, `content` e `author`, evitando que o cliente altere campos internos como `_id` ou `createdAt`.
+- **Leitura pública e escrita protegida**: qualquer pessoa lê as postagens, mas só quem tem token as altera.
+- **Imagem Docker enxuta**: base `node:18-alpine`, apenas dependências de produção e execução com o usuário `node`, sem root.
+
+## Configuração
+
+| Variável | Obrigatória | Descrição |
+|---|---|---|
+| `MONGO_URI` | sim | String de conexão do MongoDB |
+| `ACCESS_TOKEN_SECRET` | sim | Segredo usado para validar os tokens JWT |
+| `PORT` | não | Porta do servidor (padrão 3000) |
+| `MONGO_URI_TEST` | só para testes | Banco usado pelos testes automatizados |
+
+Nunca versione o arquivo `.env`. Use o `.env.example` como modelo.
